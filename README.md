@@ -1,5 +1,7 @@
 # ty-admin
 
+`ty-admin` hält sämtliche Menü-Callbacks lokal und verbindet sie über serialisierbare Callback-IDs und Client-Events mit `ty-menu`. Dadurch werden keine Lua-Funktionen in verschachtelten Tabellen zwischen Resources übertragen.
+
 Eigenständiges, serverautoritatives Adminsystem auf Basis von `ty-menu`. Das Menü bleibt beim Start unsichtbar und wird standardmäßig mit F9 angefragt. Ohne `menu.open`-Berechtigung antwortet der Server nicht und es passiert sichtbar nichts.
 
 ## Funktionsfähig

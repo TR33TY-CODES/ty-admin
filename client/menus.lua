@@ -1,6 +1,11 @@
 TYAdminClient.Menus = TYAdminClient.Menus or {}
 
 local Menus = TYAdminClient.Menus
+local CALLBACK_EVENT = 'ty-admin:client:menuCallback'
+local callbackRegistry = {}
+local callbackCounter = 0
+local prepareMenu
+local push
 
 local function notify(message)
     exports['ty-menu']:Notify(message)
@@ -19,13 +24,153 @@ local function secured(permission, item)
     return item
 end
 
-local function push(menu)
-    exports['ty-menu']:PushMenu(menu)
+local function clearCallbacks()
+    callbackRegistry = {}
+end
+
+local function registerCallback(callback)
+    if type(callback) ~= 'function' then
+        return nil
+    end
+
+    callbackCounter = callbackCounter + 1
+    local callbackId = ('%d:%d'):format(GetGameTimer(), callbackCounter)
+    callbackRegistry[callbackId] = callback
+    return callbackId
+end
+
+local function attachClientEvent(target, callback)
+    local callbackId = registerCallback(callback)
+    if not callbackId then
+        return false
+    end
+
+    target.clientEvent = CALLBACK_EVENT
+    target.payload = { callbackId = callbackId }
+    return true
+end
+
+prepareMenu = function(menu, seen)
+    if type(menu) ~= 'table' then
+        return menu
+    end
+
+    seen = seen or {}
+    if seen[menu] then
+        return menu
+    end
+    seen[menu] = true
+
+    if type(menu.onClose) == 'function' then
+        local onClose = menu.onClose
+        menu.onClose = nil
+        local callbackId = registerCallback(function()
+            onClose()
+        end)
+        menu.closeEvent = CALLBACK_EVENT
+        menu.closePayload = { callbackId = callbackId }
+    end
+
+    if type(menu.onSearch) == 'function' then
+        local onSearch = menu.onSearch
+        menu.onSearch = nil
+        local callbackId = registerCallback(function(context)
+            onSearch(tostring(context.value or ''), menu)
+        end)
+        menu.searchEvent = CALLBACK_EVENT
+        menu.searchPayload = { callbackId = callbackId }
+    end
+
+    if type(menu.onSelect) == 'function' then
+        local onSelect = menu.onSelect
+        menu.onSelect = nil
+        attachClientEvent(menu, function(context)
+            onSelect(nil, tonumber(context.originalIndex) or 0, menu)
+        end)
+    end
+
+    for index = 1, #(menu.items or {}) do
+        local originalIndex = index
+        local item = menu.items[index]
+        if type(item) == 'table' then
+            if type(item.submenu) == 'table' then
+                prepareMenu(item.submenu, seen)
+            elseif type(item.submenu) == 'function' then
+                local submenuFactory = item.submenu
+                item.submenu = nil
+                item.onSelect = function()
+                    local submenu = submenuFactory(item)
+                    if type(submenu) == 'table' then
+                        push(submenu)
+                    end
+                end
+            end
+
+            if type(item.onToggle) == 'function' then
+                local onToggle = item.onToggle
+                item.onToggle = nil
+                attachClientEvent(item, function(context)
+                    onToggle(context.value == true, item)
+                end)
+            elseif type(item.onSelect) == 'function' then
+                local onSelect = item.onSelect
+                item.onSelect = nil
+                attachClientEvent(item, function(context)
+                    onSelect(item, tonumber(context.originalIndex) or originalIndex, menu)
+                end)
+            end
+        end
+    end
+
+    return menu
+end
+
+push = function(menu)
+    return exports['ty-menu']:PushMenu(prepareMenu(menu))
+end
+
+local function replace(menu)
+    return exports['ty-menu']:ReplaceCurrent(prepareMenu(menu))
+end
+
+local function open(menu)
+    return exports['ty-menu']:OpenMenu(prepareMenu(menu))
 end
 
 local function prompt(options, callback)
-    exports['ty-menu']:Prompt(options, callback)
+    options = type(options) == 'table' and options or {}
+    local callbackId = registerCallback(function(context)
+        callback(tostring(context.value or ''))
+    end)
+    options.submitEvent = CALLBACK_EVENT
+    options.submitPayload = { callbackId = callbackId }
+    return exports['ty-menu']:Prompt(options)
 end
+
+AddEventHandler(CALLBACK_EVENT, function(payload, context)
+    local callbackId = type(payload) == 'table' and tostring(payload.callbackId or '') or ''
+    local callback = callbackRegistry[callbackId]
+    if type(callback) ~= 'function' then
+        print(('[ty-admin][MENÜ-FEHLER] Unbekannte oder abgelaufene Callback-ID: %s'):format(callbackId))
+        notify('Die Adminmenü-Aktion ist nicht mehr gültig. Öffne das Menü bitte erneut.')
+        return
+    end
+
+    local success, errorMessage = pcall(callback, type(context) == 'table' and context or {})
+    if not success then
+        print(('[ty-admin][MENÜ-CALLBACK-FEHLER] %s'):format(errorMessage))
+        notify('Die Adminmenü-Aktion ist fehlgeschlagen. Weitere Details stehen in der F8-Konsole.')
+    end
+end)
+
+AddEventHandler('ty-menu:client:closed', function(owner)
+    if owner ~= GetCurrentResourceName() then
+        return
+    end
+
+    TYAdminClient.MenuOpen = false
+    clearCallbacks()
+end)
 
 local function action(actionName, payload)
     TYAdminClient.Action(actionName, payload or {})
@@ -364,7 +509,7 @@ function Menus.OpenPlayers(replace)
     TYAdminClient.Request('players', function(success, payload, errorMessage)
         if not success then notify(errorMessage or 'Spielerliste konnte nicht geladen werden.') return end
         local menu = buildPlayerList(payload.players or {})
-        if replace then exports['ty-menu']:ReplaceCurrent(menu) else push(menu) end
+        if replace then replace(menu) else push(menu) end
     end)
 end
 
@@ -575,7 +720,7 @@ function Menus.OpenActiveVehicles(replace)
     TYAdminClient.Request('vehicles', function(success, payload, errorMessage)
         if not success then notify(errorMessage or 'Fahrzeuge konnten nicht geladen werden.') return end
         local menu = buildActiveVehicles(payload.vehicles or {})
-        if replace then exports['ty-menu']:ReplaceCurrent(menu) else push(menu) end
+        if replace then replace(menu) else push(menu) end
     end)
 end
 
@@ -783,7 +928,8 @@ function Menus.OpenStoredVehicles()
 end
 
 function Menus.OpenRoot()
-    exports['ty-menu']:OpenMenu({
+    clearCallbacks()
+    open({
         id = 'ty_admin_root',
         title = ConfigAdmin.MenuTitle,
         subtitle = TYAdminClient.Authorization.roleLabel,
