@@ -19,7 +19,7 @@ ConfigPermissions.Roles = {
         label = 'Administrator',
         ace = 'ty.role.admin',
         permissions = {
-            'menu.open', 'admin.mode', 'development.toggle',
+            'menu.open', 'development.toggle',
             'self.*', 'players.*', 'vehicles.*', 'items.*',
             'world.*', 'security.*'
         }
@@ -28,7 +28,7 @@ ConfigPermissions.Roles = {
         label = 'Entwicklung',
         ace = 'ty.role.developer',
         permissions = {
-            'menu.open', 'admin.mode', 'development.toggle',
+            'menu.open', 'development.toggle',
             'self.*', 'players.view', 'players.details', 'players.goto',
             'players.spectate', 'vehicles.*', 'items.view'
         }
@@ -37,7 +37,7 @@ ConfigPermissions.Roles = {
         label = 'Supporter',
         ace = 'ty.role.supporter',
         permissions = {
-            'menu.open', 'admin.mode',
+            'menu.open',
             'self.heal', 'self.revive', 'self.noclip', 'self.nametags',
             'self.coordinates', 'self.teleport_waypoint',
             'players.view', 'players.details', 'players.heal', 'players.revive',
@@ -51,7 +51,7 @@ ConfigPermissions.Roles = {
         label = 'Test-Supporter',
         ace = 'ty.role.trialsupporter',
         permissions = {
-            'menu.open', 'admin.mode',
+            'menu.open',
             'self.heal', 'self.noclip', 'self.nametags', 'self.coordinates',
             'players.view', 'players.details', 'players.goto',
             'players.spectate', 'players.heal'
@@ -61,7 +61,6 @@ ConfigPermissions.Roles = {
 
 ConfigPermissions.KnownPermissions = {
     'menu.open',
-    'admin.mode',
     'development.toggle',
     'self.heal',
     'self.revive',
@@ -95,6 +94,7 @@ ConfigPermissions.KnownPermissions = {
     'vehicles.repair',
     'vehicles.wash',
     'vehicles.flip',
+    'vehicles.modify',
     'vehicles.delete',
     'vehicles.godmode',
     'vehicles.park',

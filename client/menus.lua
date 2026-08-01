@@ -94,8 +94,10 @@ prepareMenu = function(menu, seen)
         local item = menu.items[index]
         if type(item) == 'table' then
             if type(item.submenu) == 'table' then
+                item.hasSubmenu = true
                 prepareMenu(item.submenu, seen)
             elseif type(item.submenu) == 'function' then
+                item.hasSubmenu = true
                 local submenuFactory = item.submenu
                 item.submenu = nil
                 item.onSelect = function()
@@ -249,7 +251,6 @@ local function openAdminFunctions()
         title = ConfigAdmin.MenuTitle,
         breadcrumb = 'ADMIN FUNKTIONEN',
         items = {
-            toggleItem('adminmode', 'Admin Mode', 'shield', 'admin.mode', 'adminMode', 'adminMode', 'Status für HUD und andere Resources'),
             secured('self.heal', {
                 id = 'heal_self', label = 'Selbst heilen', icon = 'heart',
                 onSelect = function() action('healSelf') end
@@ -280,6 +281,7 @@ local function openAdminFunctions()
             secured('development.toggle', {
                 id = 'development_menu', label = 'Development Mode', icon = 'code',
                 description = 'Bypass-Status, Koordinaten und Debugdaten',
+                hasSubmenu = true,
                 onSelect = openDevelopmentMenu
             })
         }
@@ -393,6 +395,7 @@ local function openSecurityMenu(player)
             secured('players.ban', {
                 id = 'ban', label = 'Spieler bannen', icon = 'ban',
                 description = 'Dauer und Begründung auswählen',
+                hasSubmenu = true,
                 onSelect = function() openBanDurations(player) end
             })
         }
@@ -439,6 +442,7 @@ local function openPlayerMenu(player)
             }),
             secured('players.give_item', {
                 id = 'give_item', label = 'Item geben', icon = 'box',
+                hasSubmenu = true,
                 locked = not has('items.give'),
                 disabled = not has('items.give'),
                 lockReason = 'Items geben ist für diese Rolle gesperrt.',
@@ -446,6 +450,7 @@ local function openPlayerMenu(player)
             }),
             {
                 id = 'security', label = 'Sicherheit', icon = 'shield',
+                hasSubmenu = true,
                 locked = not has('players.kick') and not has('players.ban'),
                 disabled = not has('players.kick') and not has('players.ban'),
                 onSelect = function() openSecurityMenu(player) end
@@ -471,6 +476,7 @@ local function buildPlayerList(players)
             label = ('[%d] %s'):format(player.playerId, player.name),
             description = ('Source %d · Bucket %d'):format(player.source, player.routingBucket),
             icon = 'user',
+            hasSubmenu = true,
             tags = { player.name, tostring(player.playerId), tostring(player.source) },
             tooltip = {
                 title = player.name,
@@ -505,11 +511,11 @@ local function buildPlayerList(players)
     }
 end
 
-function Menus.OpenPlayers(replace)
+function Menus.OpenPlayers(replaceCurrent)
     TYAdminClient.Request('players', function(success, payload, errorMessage)
         if not success then notify(errorMessage or 'Spielerliste konnte nicht geladen werden.') return end
         local menu = buildPlayerList(payload.players or {})
-        if replace then replace(menu) else push(menu) end
+        if replaceCurrent then replace(menu) else push(menu) end
     end)
 end
 
@@ -650,6 +656,10 @@ local function openVehicleDetails(vehicle)
                 id = 'flip', label = 'Aufrichten / Flippen', icon = 'rotate',
                 onSelect = function() action('flipVehicle', { networkId = vehicle.networkId }) end
             }),
+            secured('vehicles.modify', {
+                id = 'performance', label = 'Performance maximieren', icon = 'wrench',
+                onSelect = function() action('performanceVehicle', { networkId = vehicle.networkId }) end
+            }),
             secured('vehicles.godmode', {
                 id = 'vehicle_godmode', label = 'Fahrzeug-Godmode', icon = 'shield', type = 'toggle', value = vehicle.godmode,
                 onToggle = function(enabled) action('godmodeVehicle', { networkId = vehicle.networkId, enabled = enabled }) end
@@ -697,6 +707,7 @@ local function buildActiveVehicles(vehicles)
             label = ('%s · %s'):format(vehicle.plate, vehicle.label),
             description = ('Net %d · Bucket %d'):format(vehicle.networkId, vehicle.routingBucket),
             icon = 'car',
+            hasSubmenu = true,
             tags = { vehicle.plate, vehicle.model, vehicle.label, tostring(vehicle.networkId) },
             tooltip = vehicleTooltip(vehicle),
             onSelect = function() openVehicleDetails(vehicle) end
@@ -716,11 +727,11 @@ local function buildActiveVehicles(vehicles)
     }
 end
 
-function Menus.OpenActiveVehicles(replace)
+function Menus.OpenActiveVehicles(replaceCurrent)
     TYAdminClient.Request('vehicles', function(success, payload, errorMessage)
         if not success then notify(errorMessage or 'Fahrzeuge konnten nicht geladen werden.') return end
         local menu = buildActiveVehicles(payload.vehicles or {})
-        if replace then replace(menu) else push(menu) end
+        if replaceCurrent then replace(menu) else push(menu) end
     end)
 end
 
@@ -780,43 +791,115 @@ local function openAllVehicleModels()
 end
 
 local function openVehicleSpawner()
-    local items = {
-        {
-            id = 'all_models', label = 'Alle Fahrzeuge durchsuchen', icon = 'search',
-            onSelect = openAllVehicleModels
-        }
-    }
-
-    for index = 1, #ConfigAdmin.VehicleCategories do
-        local category = ConfigAdmin.VehicleCategories[index]
-        local names = {}
-        for vehicleIndex = 1, #category.vehicles do names[#names + 1] = category.vehicles[vehicleIndex].model end
-        items[#items + 1] = {
-            id = category.id,
-            label = category.label,
-            description = ('%d Fahrzeuge'):format(#category.vehicles),
-            searchText = table.concat(names, ' '),
-            icon = 'car',
-            onSelect = function() openVehicleCategory(category) end
-        }
-    end
-
     push({
         id = 'ty_admin_vehicle_spawner',
         title = 'FAHRZEUG SPAWNEN',
-        breadcrumb = 'FAHRZEUGE > KLASSEN',
-        search = { label = 'Klasse suchen', placeholder = 'Klasse oder Fahrzeugmodell' },
-        items = items
+        breadcrumb = 'FAHRZEUGE > SPAWNEN',
+        items = {
+            {
+                id = 'vehicle_search', label = 'Fahrzeug suchen', icon = 'search',
+                description = 'Alle freigegebenen Modelle durchsuchen',
+                hasSubmenu = true,
+                onSelect = openAllVehicleModels
+            },
+            {
+                id = 'vehicle_classes', label = 'Alle Fahrzeugklassen', icon = 'layers',
+                description = 'Nach Fahrzeugklasse auswählen',
+                hasSubmenu = true,
+                onSelect = function()
+                    local items = {}
+
+                    for index = 1, #ConfigAdmin.VehicleCategories do
+                        local category = ConfigAdmin.VehicleCategories[index]
+                        local names = {}
+                        for vehicleIndex = 1, #category.vehicles do
+                            names[#names + 1] = category.vehicles[vehicleIndex].model
+                        end
+                        items[#items + 1] = {
+                            id = category.id,
+                            label = category.label,
+                            description = ('%d Fahrzeuge'):format(#category.vehicles),
+                            searchText = table.concat(names, ' '),
+                            icon = 'car',
+                            hasSubmenu = true,
+                            onSelect = function() openVehicleCategory(category) end
+                        }
+                    end
+
+                    push({
+                        id = 'ty_admin_vehicle_classes',
+                        title = 'FAHRZEUGKLASSEN',
+                        breadcrumb = 'FAHRZEUGE > SPAWNEN > KLASSEN',
+                        search = { label = 'Klasse suchen', placeholder = 'Klasse oder Fahrzeugmodell' },
+                        items = items
+                    })
+                end
+            }
+        }
     })
 end
 
-local function nearestVehicleAction(actionName)
+local function nearestVehicleAction(actionName, networkId, payload)
+    networkId = tonumber(networkId) or TYAdminClient.GetNearestVehicleNetworkId(10.0)
+    if not networkId then
+        notify('Kein aktives Fahrzeug in der Nähe gefunden.')
+        return
+    end
+
+    payload = type(payload) == 'table' and payload or {}
+    payload.networkId = networkId
+    action(actionName, payload)
+end
+
+local function openNearbyVehicleMenu()
     local networkId = TYAdminClient.GetNearestVehicleNetworkId(10.0)
     if not networkId then
         notify('Kein aktives Fahrzeug in der Nähe gefunden.')
         return
     end
-    action(actionName, { networkId = networkId })
+
+    local godmodeEnabled = TYAdminClient.IsVehicleGodmode and TYAdminClient.IsVehicleGodmode(networkId) or false
+
+    push({
+        id = 'ty_admin_nearby_vehicle',
+        title = 'FAHRZEUG IN UMGEBUNG',
+        subtitle = ('Netzwerk-ID %d'):format(networkId),
+        breadcrumb = 'FAHRZEUGE > UMGEBUNG',
+        items = {
+            secured('vehicles.repair', {
+                id = 'nearby_repair', label = 'Reparieren', icon = 'wrench',
+                onSelect = function() nearestVehicleAction('repairVehicle', networkId) end
+            }),
+            secured('vehicles.wash', {
+                id = 'nearby_wash', label = 'Waschen', icon = 'droplet',
+                onSelect = function() nearestVehicleAction('washVehicle', networkId) end
+            }),
+            secured('vehicles.flip', {
+                id = 'nearby_flip', label = 'Aufrichten / Flippen', icon = 'rotate',
+                onSelect = function() nearestVehicleAction('flipVehicle', networkId) end
+            }),
+            secured('vehicles.modify', {
+                id = 'nearby_performance', label = 'Performance maximieren', icon = 'wrench',
+                onSelect = function() nearestVehicleAction('performanceVehicle', networkId) end
+            }),
+            secured('vehicles.godmode', {
+                id = 'nearby_godmode', label = 'Fahrzeug-Godmode', icon = 'shield',
+                type = 'toggle', value = godmodeEnabled,
+                onToggle = function(enabled)
+                    nearestVehicleAction('godmodeVehicle', networkId, { enabled = enabled })
+                end
+            }),
+            secured('vehicles.park', {
+                id = 'nearby_park', label = 'Einparken', icon = 'garage',
+                description = 'Adapter für ty-garage vorbereitet',
+                onSelect = function() nearestVehicleAction('parkVehicle', networkId) end
+            }),
+            secured('vehicles.delete', {
+                id = 'nearby_delete', label = 'Fahrzeug löschen', icon = 'trash',
+                onSelect = function() nearestVehicleAction('deleteVehicle', networkId) end
+            })
+        }
+    })
 end
 
 local function openVehicleMenu()
@@ -828,33 +911,25 @@ local function openVehicleMenu()
             secured('vehicles.view', {
                 id = 'active', label = 'Aktive Fahrzeuge suchen', icon = 'search',
                 description = 'Suche auch direkt über Kennzeichen',
+                hasSubmenu = true,
                 onSelect = function() Menus.OpenActiveVehicles(false) end
             }),
             secured('vehicles.search', {
                 id = 'stored', label = 'Gespeicherte Fahrzeuge', icon = 'garage',
                 description = 'Adapter für ty-garage vorbereitet',
+                hasSubmenu = true,
                 onSelect = function() Menus.OpenStoredVehicles() end
             }),
             secured('vehicles.spawn', {
                 id = 'spawn', label = 'Fahrzeug spawnen', icon = 'plus',
+                hasSubmenu = true,
                 onSelect = openVehicleSpawner
             }),
-            secured('vehicles.repair', {
-                id = 'nearest_repair', label = 'Nächstes Fahrzeug reparieren', icon = 'wrench',
-                onSelect = function() nearestVehicleAction('repairVehicle') end
-            }),
-            secured('vehicles.wash', {
-                id = 'nearest_wash', label = 'Nächstes Fahrzeug waschen', icon = 'droplet',
-                onSelect = function() nearestVehicleAction('washVehicle') end
-            }),
-            secured('vehicles.flip', {
-                id = 'nearest_flip', label = 'Nächstes Fahrzeug aufrichten', icon = 'rotate',
-                onSelect = function() nearestVehicleAction('flipVehicle') end
-            }),
-            secured('vehicles.park', {
-                id = 'nearest_park', label = 'Nächstes Fahrzeug einparken', icon = 'garage',
-                description = 'Adapter für ty-garage vorbereitet',
-                onSelect = function() nearestVehicleAction('parkVehicle') end
+            secured('vehicles.view', {
+                id = 'nearby', label = 'Fahrzeuge in Umgebung', icon = 'car',
+                description = 'Funktionen für das nächste Fahrzeug',
+                hasSubmenu = true,
+                onSelect = openNearbyVehicleMenu
             })
         }
     })
@@ -881,6 +956,7 @@ function Menus.OpenStoredVehicles()
                     label = ('%s · %s'):format(vehicle.plate, vehicle.label),
                     description = ('Garage: %s'):format(vehicle.garage),
                     icon = 'garage',
+                    hasSubmenu = true,
                     tags = { vehicle.plate, vehicle.model, vehicle.label, vehicle.owner, vehicle.garage },
                     tooltip = {
                         title = vehicle.plate,
@@ -937,20 +1013,24 @@ function Menus.OpenRoot()
         footer = 'F9 Schließen · Pfeiltasten · Enter · Backspace',
         onClose = function() TYAdminClient.MenuOpen = false end,
         items = {
-            secured('admin.mode', {
+            secured('menu.open', {
                 id = 'admin', label = 'Admin Funktionen', icon = 'shield',
+                hasSubmenu = true,
                 onSelect = openAdminFunctions
             }),
             secured('players.view', {
                 id = 'players', label = 'Spieler', icon = 'users',
+                hasSubmenu = true,
                 onSelect = function() Menus.OpenPlayers(false) end
             }),
             secured('vehicles.view', {
                 id = 'vehicles', label = 'Fahrzeuge', icon = 'car',
+                hasSubmenu = true,
                 onSelect = openVehicleMenu
             }),
             secured('items.view', {
                 id = 'items', label = 'Items', icon = 'box',
+                hasSubmenu = true,
                 onSelect = function() openItemsMenu(nil, nil) end
             })
         }

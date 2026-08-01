@@ -8,7 +8,6 @@ local Data = TYAdmin.Data
 local Core = exports['ty-core']:GetCoreObject()
 
 local actionPermissions = {
-    adminMode = 'admin.mode',
     developmentMode = 'development.toggle',
     godmode = 'self.godmode',
     invisible = 'self.invisible',
@@ -34,6 +33,7 @@ local actionPermissions = {
     repairVehicle = 'vehicles.repair',
     washVehicle = 'vehicles.wash',
     flipVehicle = 'vehicles.flip',
+    performanceVehicle = 'vehicles.modify',
     deleteVehicle = 'vehicles.delete',
     godmodeVehicle = 'vehicles.godmode',
     parkVehicle = 'vehicles.park',
@@ -45,7 +45,6 @@ local actionPermissions = {
 }
 
 local modeKeys = {
-    adminMode = true,
     developmentMode = true,
     godmode = true,
     invisible = true,
@@ -58,7 +57,6 @@ local modeKeys = {
 
 local function defaultState()
     return {
-        adminMode = false,
         developmentMode = false,
         godmode = false,
         invisible = false,
@@ -100,7 +98,6 @@ local function applyState(source)
     local playerState = Player(source)
 
     if playerState and playerState.state then
-        playerState.state:set('tyAdminMode', state.adminMode, true)
         playerState.state:set('tyDevelopmentMode', state.developmentMode, true)
     end
 
@@ -115,14 +112,7 @@ local function setMode(source, action, enabled)
     local state = getState(source)
     enabled = enabled == true
 
-    if action == 'adminMode' and not enabled then
-        TYAdmin.States[source] = defaultState()
-    else
-        state[action] = enabled
-        if action == 'developmentMode' and enabled then
-            state.adminMode = true
-        end
-    end
+    state[action] = enabled
 
     applyState(source)
     return true, enabled and 'Modus aktiviert.' or 'Modus deaktiviert.', getState(source)
@@ -217,6 +207,9 @@ local function vehicleAction(source, action, payload)
     elseif action == 'flipVehicle' then
         TriggerClientEvent('ty-admin:client:vehicleAction', source, 'flip', payload.networkId, {})
         return true, 'Fahrzeug aufgerichtet.'
+    elseif action == 'performanceVehicle' then
+        TriggerClientEvent('ty-admin:client:vehicleAction', source, 'performance', payload.networkId, {})
+        return true, 'Performance-Modifikationen wurden maximiert.'
     end
 
     return false, 'Unbekannte Fahrzeugaktion.'
@@ -285,7 +278,10 @@ function Actions.Execute(source, action, payload)
         playerEffect(target.source, 'teleport', position)
         return true, ('%s wurde zu dir teleportiert.'):format(target.name)
     elseif action == 'spectatePlayer' then
-        TriggerClientEvent('ty-admin:client:spectate', source, target.source)
+        if getState(source).noclip then
+            return false, 'Deaktiviere Noclip, bevor du Spectate startest.'
+        end
+        TriggerClientEvent('ty-admin:client:spectate', source, target.source, Data.GetPlayerPosition(target.source))
         return true, ('Spectate für %s umgeschaltet.'):format(target.name)
     elseif action == 'freezePlayer' then
         local enabled = payload.enabled == true

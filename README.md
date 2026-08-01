@@ -7,17 +7,21 @@ Eigenständiges, serverautoritatives Adminsystem auf Basis von `ty-menu`. Das Me
 ## Funktionsfähig
 
 - feingranulare ACE-Rollen und zusätzlich serverseitige Prüfung jeder Aktion
-- Admin Mode und Development Mode als Exports und synchronisierte State Bags
-- Godmode, Unsichtbarkeit, Noclip, Nametags, Thermalsicht, Koordinaten- und Fahrzeugdaten
+- Development Mode als Export und synchronisierter State Bag
+- sauber rücksetzbarer Godmode, Unsichtbarkeit und Noclip sowie Nametags, Thermalsicht, Koordinaten- und Fahrzeugdaten
 - Selbstheilung, Wiederbelebung und Wegpunkt-Teleport
 - aktive Spieler suchen und alle derzeit vorhandenen Core-Daten anzeigen
-- Spieler heilen, wiederbeleben, beobachten, einfrieren, holen oder zu ihnen teleportieren
+- Spieler heilen, wiederbeleben, mit Rückkehrposition beobachten, einfrieren, holen oder zu ihnen teleportieren
 - Kick mit Begründung
 - persistenter Bann mit Dauer und Begründung in `ty_characters.data_json`
 - `tyunban FESTE_ID` in der Konsole beziehungsweise mit `security.unban`
 - aktive Fahrzeuge nach Kennzeichen/Modell suchen
-- Fahrzeug-Teleport, Reparatur, Waschen, Flippen, Godmode und Löschen
-- Fahrzeuge aus erlaubten Klassen/Modellen spawnen
+- Fahrzeug-Teleport, Reparatur, Waschen, Flippen, Performance-Mods, Godmode und Löschen
+- Fahrzeuge über Suche oder ein separates Klassen-Untermenü spawnen
+
+Noclip verwendet `W/A/S/D`, `Q/E` für hoch/runter, `Shift` für schnell und `Strg` für langsam. Das normale Adminmenü blockiert dabei weder Bewegung noch Kamera. Sichtbarkeit, Kollision, Alpha und Invincibility werden beim Ausschalten und beim Stoppen der Resource wiederhergestellt.
+
+In der Fahrzeugübersicht öffnet `Fahrzeuge in Umgebung` die Reparatur-, Wasch-, Flip-, Performance-, Godmode-, Einpark- und Löschaktionen für das beim Öffnen ermittelte nächste Fahrzeug. Pfeile werden ausschließlich bei echten Untermenüs dargestellt.
 
 ## Vorbereitet
 
@@ -33,12 +37,11 @@ Beispiel:
 add_principal identifier.license:DEINE_LICENSE group.supporter
 ```
 
-## Admin-/Development-Status
+## Development-Status
 
-Clientseitig, zum Beispiel im HUD:
+Clientseitig:
 
 ```lua
-local adminMode = exports['ty-admin']:IsAdminMode()
 local developmentMode = exports['ty-admin']:IsDevelopmentMode()
 ```
 

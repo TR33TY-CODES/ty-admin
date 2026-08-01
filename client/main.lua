@@ -40,8 +40,8 @@ RegisterNetEvent('ty-admin:client:response', function(requestId, success, payloa
 end)
 
 RegisterNetEvent('ty-admin:client:actionResult', function(success, message, data)
-    if type(data) == 'table' and data.adminMode ~= nil then
-        TYAdminClient.State = data
+    if type(data) == 'table' and data.developmentMode ~= nil then
+        TriggerEvent('ty-admin:client:applyState', data)
     end
 
     if message and message ~= '' then
@@ -64,7 +64,9 @@ RegisterCommand(ConfigAdmin.OpenCommand, function()
             roleLabel = payload.roleLabel,
             permissions = payload.permissions or {}
         }
-        TYAdminClient.State = payload.state or TYAdminClient.State
+        if type(payload.state) == 'table' then
+            TriggerEvent('ty-admin:client:applyState', payload.state)
+        end
         TYAdminClient.Menus.OpenRoot()
     end)
 end, false)
@@ -91,14 +93,9 @@ AddEventHandler('onClientResourceStop', function(resourceName)
         exports['ty-menu']:CloseMenu(true)
     end
 
-    local ped = PlayerPedId()
-    SetEntityInvincible(ped, false)
-    SetPlayerInvincible(PlayerId(), false)
-    SetEntityVisible(ped, true, false)
-    SetEntityCollision(ped, true, true)
-    FreezeEntityPosition(ped, false)
-    SetEntityAlpha(ped, 255, false)
-    SetSeethrough(false)
+    if TYAdminClient.ResetEffects then
+        TYAdminClient.ResetEffects()
+    end
 end)
 
 exports('HasPermission', TYAdminClient.HasPermission)

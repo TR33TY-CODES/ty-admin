@@ -3,7 +3,7 @@ game 'gta5'
 
 author 'Treety / FuseLab Studios'
 description 'Modulares TY Adminsystem auf Basis von ty-menu'
-version '0.1.1'
+version '0.2.0'
 
 lua54 'yes'
 

@@ -82,10 +82,14 @@ end)
 RegisterNetEvent('ty-admin:server:action', function(action, payload)
     local source = tonumber(source)
     if not cooldownPassed(actionTimes, source, ConfigAdmin.ActionCooldown) then
+        Actions.SendResult(source, false, 'Bitte warte kurz vor der nächsten Adminaktion.', Actions.GetState(source))
         return
     end
 
     local success, message, data = Actions.Execute(source, tostring(action or ''), payload)
+    if not success and data == nil then
+        data = Actions.GetState(source)
+    end
     Actions.SendResult(source, success, message, data)
 end)
 
@@ -139,10 +143,6 @@ end, false)
 
 exports('HasPermission', Permissions.Has)
 exports('GetRole', Permissions.GetRole)
-exports('IsAdminMode', function(source)
-    local state = TYAdmin.States[tonumber(source)]
-    return state ~= nil and state.adminMode == true
-end)
 exports('IsDevelopmentMode', function(source)
     local state = TYAdmin.States[tonumber(source)]
     return state ~= nil and state.developmentMode == true
